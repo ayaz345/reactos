@@ -272,8 +272,8 @@ def key_objectid_str(objectid, _type):
   if _type == DEV_EXTENT_KEY:
     return str(objectid)
   if _type == QGROUP_RELATION_KEY:
-    return "{}/{}".format(qgroup_level(objectid), qgroup_subvid(objectid))
-  if _type == UUID_KEY_SUBVOL or _type == UUID_KEY_RECEIVED_SUBVOL:
+    return f"{qgroup_level(objectid)}/{qgroup_subvid(objectid)}"
+  if _type in [UUID_KEY_SUBVOL, UUID_KEY_RECEIVED_SUBVOL]:
     return "0x{:0>16x}".format(objectid)
 
   if objectid == ROOT_TREE_OBJECTID and _type == DEV_ITEM_KEY:
@@ -335,33 +335,30 @@ def key_type_str(_type):
 
 
 def key_offset_str(offset, _type):
-  if _type == QGROUP_RELATION_KEY or _type == QGROUP_INFO_KEY or _type == QGROUP_LIMIT_KEY:
-    return "{}/{}".format(qgroup_level(offset), qgroup_subvid(offset))
-  if _type == UUID_KEY_SUBVOL or _type == UUID_KEY_RECEIVED_SUBVOL:
+  if _type in [QGROUP_RELATION_KEY, QGROUP_INFO_KEY, QGROUP_LIMIT_KEY]:
+    return f"{qgroup_level(offset)}/{qgroup_subvid(offset)}"
+  if _type in [UUID_KEY_SUBVOL, UUID_KEY_RECEIVED_SUBVOL]:
     return "0x{:0>16x}".format(offset)
   if _type == ROOT_ITEM_KEY:
     return _key_objectid_str_map.get(offset, str(offset))
-  if offset == ULLONG_MAX:
-    return '-1'
-
-  return str(offset)
+  return '-1' if offset == ULLONG_MAX else str(offset)
 
 
 def flags_str(flags, flags_str_map):
-  ret = []
-  for flag in sorted(flags_str_map.keys()):
-    if flags & flag:
-      ret.append(flags_str_map[flag])
-  if len(ret) == 0:
+  ret = [
+      flags_str_map[flag] for flag in sorted(flags_str_map.keys())
+      if flags & flag
+  ]
+  if not ret:
     ret.append("none")
     return '|'.join(ret)
 
 
 def embedded_text_for_str(text):
   try:
-    return "utf-8 {}".format(text.decode('utf-8'))
+    return f"utf-8 {text.decode('utf-8')}"
   except UnicodeDecodeError:
-   return "raw {}".format(repr(text))
+    return f"raw {repr(text)}"
 
 
 # === Basic structures
@@ -442,9 +439,7 @@ class Key(object):
   self._offset = (self._key & ((1 << 64) - 1))
 
  def __lt__(self, other):
-  if isinstance(other, Key):
-   return self._key < other._key
-  return self._key < other
+   return self._key < other._key if isinstance(other, Key) else self._key < other
 
  def __le__(self, other):
   if isinstance(other, Key):
@@ -462,16 +457,10 @@ class Key(object):
   return self._key >= other
 
  def __gt__(self, other):
-  if isinstance(other, Key):
-   return self._key > other._key
-  return self._key > other
+   return self._key > other._key if isinstance(other, Key) else self._key > other
 
  def __str__(self):
-  return "({} {} {})".format(
-   key_objectid_str(self._objectid, self._type),
-   key_type_str(self._type),
-   key_offset_str(self._offset, self._type),
-  )
+   return f"({key_objectid_str(self._objectid, self._type)} {key_type_str(self._type)} {key_offset_str(self._offset, self._type)})"
 
  def __add__(self, amount):
   new_key = copy.copy(self)
@@ -499,13 +488,7 @@ class InnerKey(Key):
    self.generation = unpacked_data[4]
 
   def __str__(self):
-   return "(inner_key {} {} {} block_num {}, generation {})".format(
-    key_objectid_str(self._objectid, self._type),
-    key_type_str(self._type),
-    key_offset_str(self._offset, self._type),
-    self.block_num,
-    self.generation,
-   )
+    return f"(inner_key {key_objectid_str(self._objectid, self._type)} {key_type_str(self._type)} {key_offset_str(self._offset, self._type)} block_num {self.block_num}, generation {self.generation})"
 
 class LeafKey(Key):
   sstruct = struct.Struct('<QBQLL')
